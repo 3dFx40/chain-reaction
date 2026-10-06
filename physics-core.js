@@ -1,8 +1,9 @@
+import {springsOf,switchesOf,portalPairsOf} from './parts.js';
 export const W=700,H=630;
-export function createFromDefinition(definition,index=0){const l=structuredClone(definition);return {...l,index,spawn:{...l.ball},rails:l.rails||[],ball:{...l.ball,vx:0,vy:0,r:13},dominoes:(l.dominoes||[]).map(d=>({...d,angle:0,omega:0,hit:false})),mode:'edit',time:0,stallTime:0,contacts:0,trail:[],events:[],visited:[],routeIndex:0,failure:'',springCooldown:0,portalCooldown:0,bumperCooldown:0,switchOn:false,switchTime:null,particles:[]};}
-export function resetWorld(w){Object.assign(w.ball,w.spawn,{vx:0,vy:0});w.mode='edit';w.time=0;w.stallTime=0;w.contacts=0;w.trail=[];w.events=[];w.visited=[];w.routeIndex=0;w.failure='';w.springCooldown=0;w.portalCooldown=0;w.bumperCooldown=0;w.switchOn=false;w.switchTime=null;w.dominoes.forEach(d=>Object.assign(d,{angle:0,omega:0,hit:false}));w.particles=[];}
+export function createFromDefinition(definition,index=0){const l=structuredClone(definition),springs=springsOf(l),switches=switchesOf(l);return {...l,index,springs,switches,spring:springs[0],switch:switches[0],switchStates:{},spawn:{...l.ball},rails:l.rails||[],ball:{...l.ball,vx:0,vy:0,r:13},dominoes:(l.dominoes||[]).map(d=>({...d,angle:0,omega:0,hit:false})),mode:'edit',time:0,stallTime:0,contacts:0,trail:[],events:[],visited:[],routeIndex:0,failure:'',springCooldown:0,portalCooldown:0,bumperCooldown:0,switchOn:false,switchTime:null,particles:[]};}
+export function resetWorld(w){Object.assign(w.ball,w.spawn,{vx:0,vy:0});w.mode='edit';w.time=0;w.stallTime=0;w.contacts=0;w.trail=[];w.events=[];w.visited=[];w.routeIndex=0;w.failure='';w.springCooldown=0;w.portalCooldown=0;w.bumperCooldown=0;w.switchOn=false;w.switchTime=null;w.switchStates={};w.dominoes.forEach(d=>Object.assign(d,{angle:0,omega:0,hit:false}));w.particles=[];}
 export function startWorld(w){resetWorld(w);w.mode='running';}
-export function gateOpen(w){return !w.switch||(w.switchOn&&(!w.switch.hold||w.time-w.switchTime<w.switch.hold));}
+export function gateOpen(w){return switchesOf(w).every(s=>w.switchStates?.[s.id]!==undefined&&(!s.hold||w.time-w.switchStates[s.id]<s.hold));}
 export function routeComplete(w){return w.routeIndex===(w.route||[]).length;}
 function fail(w,reason){if(w.mode!=='running')return;w.failure=reason;w.mode='failed';w.events.push({type:'failed'});}
 function visit(w,id){if(w.visited.includes(id))return;w.visited.push(id);if(!(w.route||[]).includes(id))return;if(w.route[w.routeIndex]!==id){fail(w,'החלקים הופעלו בסדר הלא נכון. התחילו לפי סדר השרשרת.');return;}w.routeIndex++;w.events.push({type:'checkpoint',id});}
@@ -16,13 +17,12 @@ export function stepWorld(w,dt){
  const b=w.ball;b.vy+=620*dt;b.vx*=Math.exp(-.045*dt);b.x+=b.vx*dt;b.y+=b.vy*dt;
  for(const h of w.hazards||[])if(rectContact(w,h)){fail(w,'הכדור נפל למלכודת. צריך למצוא דרך מעליה.');return;}
  for(const r of w.walls||[])wall(w,r);
- if(w.switch&&!w.switchOn&&Math.hypot(b.x-w.switch.x,b.y-w.switch.y)<29){w.switchOn=true;w.switchTime=w.time;w.contacts++;visit(w,'switch');w.events.push({type:'switch',x:w.switch.x,y:w.switch.y});}
- if(w.switchOn&&w.switch?.hold&&!gateOpen(w)){fail(w,'הזמן נגמר והשער נסגר. שמרו יותר תנופה אחרי המתג.');return;}
+ for(const s of switchesOf(w)){if(w.switchStates[s.id]===undefined&&Math.hypot(b.x-s.x,b.y-s.y)<29){w.switchStates[s.id]=w.time;w.switchOn=gateOpen(w);if(w.switchTime===null)w.switchTime=w.time;w.contacts++;visit(w,s.id);w.events.push({type:'switch',x:s.x,y:s.y});}if(s.hold&&w.switchStates[s.id]!==undefined&&w.time-w.switchStates[s.id]>=s.hold){fail(w,'הזמן נגמר והשער נסגר. שמרו יותר תנופה אחרי המתג.');return;}}
  if(w.gate&&!gateOpen(w))segment(w,w.gate.x-w.gate.len/2,w.gate.y,w.gate.x+w.gate.len/2,w.gate.y,.4);
- if(w.portals&&w.portalCooldown===0&&Math.hypot(b.x-w.portals[0].x,b.y-w.portals[0].y)<28){b.x=w.portals[1].x;b.y=w.portals[1].y+36;w.portalCooldown=.5;w.trail=[];w.contacts++;visit(w,'portal');w.events.push({type:'portal',x:b.x,y:b.y});}
+ if(w.portalCooldown===0)for(const pair of portalPairsOf(w)){if(Math.hypot(b.x-pair.entrance.x,b.y-pair.entrance.y)<28){b.x=pair.exit.x;b.y=pair.exit.y+36;w.portalCooldown=.5;w.trail=[];w.contacts++;visit(w,pair.id);w.events.push({type:'portal',x:b.x,y:b.y});break;}}
  if(w.bumpers&&w.bumperCooldown===0)for(const s of w.bumpers){if(Math.hypot(b.x-s.x,b.y-s.y)<b.r+s.r){const power=s.power||470;b.vx=Math.cos(s.a)*power;b.vy=Math.sin(s.a)*power;b.x=s.x+Math.cos(s.a)*(s.r+16);b.y=s.y+Math.sin(s.a)*(s.r+16);w.bumperCooldown=.2;w.contacts++;visit(w,s.id);w.events.push({type:'bumper',x:s.x,y:s.y});}}
  for(const r of w.rails){const dx=Math.cos(r.a)*r.len/2,dy=Math.sin(r.a)*r.len/2;if(segment(w,r.x-dx,r.y-dy,r.x+dx,r.y+dy))visit(w,r.id);}
- if(w.spring&&w.springCooldown===0){const s=w.spring;if(Math.hypot(b.x-s.x,b.y-s.y)<b.r+28){const power=s.power||520;b.vx=Math.cos(s.a)*power;b.vy=Math.sin(s.a)*power;b.x=s.x+Math.cos(s.a)*45;b.y=s.y+Math.sin(s.a)*45;w.springCooldown=.3;w.contacts++;visit(w,s.id);w.events.push({type:'spring',x:s.x,y:s.y});}}
+ if(w.springCooldown===0)for(const s of springsOf(w)){if(Math.hypot(b.x-s.x,b.y-s.y)<b.r+28){const power=s.power||520;b.vx=Math.cos(s.a)*power;b.vy=Math.sin(s.a)*power;b.x=s.x+Math.cos(s.a)*45;b.y=s.y+Math.sin(s.a)*45;w.springCooldown=.3;w.contacts++;visit(w,s.id);w.events.push({type:'spring',x:s.x,y:s.y});break;}}
  for(let i=0;i<w.dominoes.length;i++){
   const d=w.dominoes[i],dir=d.dir||1,height=d.height||80;
   if(!d.hit&&Math.abs(b.x-d.x)<b.r+11&&b.y>d.y-height-3&&b.y<d.y+7&&Math.hypot(b.vx,b.vy)>60){d.hit=true;d.omega=2.2;w.contacts++;if(i===0)visit(w,'domino');w.events.push({type:'domino',x:d.x,y:d.y});b.vx*=.55;b.vy*=.75;}

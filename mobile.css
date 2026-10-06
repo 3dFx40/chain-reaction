@@ -13,3 +13,5 @@ body{font-family:ChainHebrew,Arial,sans-serif}
 
 #rotate:not(:disabled){color:var(--ink);border-color:#bcab92;background:#fffaf1}.interaction-tip{color:#686d65;line-height:1.6}@media(max-width:800px){.interaction-tip{font-size:11px}}
 button,a{touch-action:manipulation}
+#power[hidden]{display:none}.toolbar{flex-wrap:wrap}#power{flex-basis:100%;max-width:440px;min-height:44px}.under-board{flex-wrap:wrap}
+.toolbar.has-power #power[hidden]{display:block;visibility:hidden;pointer-events:none}
