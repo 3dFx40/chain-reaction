@@ -1,0 +1,14 @@
+node_modules/
+output/
+*.log
+.tools/
+.signing/
+dist/
+android/.gradle/
+android/**/build/
+android/local.properties
+*.jks
+*.keystore
+*.apk
+*.aab
+progress.md

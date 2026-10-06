@@ -1,0 +1,7 @@
+export function movableItems(w){return [...w.rails,...(w.spring?[w.spring]:[]),...(w.bumpers||[]),...(w.portals||[]),...(w.switch?[w.switch]:[])];}
+export function canRotate(item){return !!item&&typeof item.a==='number'&&item.edit?.rotate!==false&&!item.fixed;}
+export function canMove(item){return !!item&&!item.fixed&&item.edit?.move!=='none';}
+export function overlapsWall(item,walls=[]){const count=Math.ceil((item.len||0)/6)+1,points=item.len?Array.from({length:count},(_,i)=>{const t=(i/(count-1)-.5)*item.len;return {x:item.x+Math.cos(item.a)*t,y:item.y+Math.sin(item.a)*t,r:8};}):[{x:item.x,y:item.y,r:27}];return walls.some(w=>points.some(p=>Math.hypot(p.x-Math.max(w.x,Math.min(w.x+w.w,p.x)),p.y-Math.max(w.y,Math.min(w.y+w.h,p.y)))<p.r));}
+export function rotateItem(item,angle,world){if(!canRotate(item))return false;const bounds=item.edit?.angle||[-Math.PI,Math.PI];const normalized=Math.atan2(Math.sin(angle),Math.cos(angle)),a=Math.max(bounds[0],Math.min(bounds[1],normalized));if(overlapsWall({...item,a},world?.walls))return false;item.a=a;return true;}
+export function moveItem(item,x,y,world){if(!canMove(item))return false;const e=item.edit||{},b=e.bounds||{xMin:60,xMax:640,yMin:90,yMax:550};if(e.move==='x')y=item.y;if(e.move==='y')x=item.x;x=Math.max(b.xMin,Math.min(b.xMax,x));y=Math.max(b.yMin,Math.min(b.yMax,y));if(overlapsWall({...item,x,y},world?.walls))return false;item.x=x;item.y=y;return true;}
+export function partLabel(w,id){const p=movableItems(w).find(o=>o.id===id);return p?.label||({domino:'דומינו',switch:'מתג',portal:'מעבר'}[id])||id;}

@@ -1,0 +1,44 @@
+plugins { id 'com.android.application' }
+def signingFile = rootProject.file('../.signing/android.properties')
+def signing = new Properties()
+if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+android {
+    namespace 'com.chainreaction.game'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+    defaultConfig {
+        applicationId 'com.chainreaction.game'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+    signingConfigs {
+        if (signingFile.exists()) {
+            release {
+                storeFile rootProject.file('../.signing/release.jks')
+                storePassword signing['storePassword']
+                keyAlias signing['keyAlias']
+                keyPassword signing['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (signingFile.exists()) signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildFeatures { buildConfig true }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
+def syncWeb = tasks.register('syncWebAssets', Sync) {
+    from(rootProject.file('..')) {
+        include '*.html', '*.css', '*.js', 'assets/**', 'icon.svg', 'manifest.json', 'LICENSES/**', 'THIRD_PARTY_NOTICES.md'
+        exclude 'server.js', 'sw.js'
+    }
+    into layout.buildDirectory.dir('generated/webAssets/www')
+}
+android.sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/webAssets')
+tasks.named('preBuild').configure { dependsOn syncWeb }
